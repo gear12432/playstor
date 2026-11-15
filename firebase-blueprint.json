@@ -465,9 +465,35 @@
         }
       },
       "required": ["id", "email", "invitedBy", "status", "createdAt", "updatedAt"]
+    },
+    "AdminCredential": {
+      "title": "AdminCredential",
+      "description": "Firestore-backed admin login credential record stored at admin/gmail.",
+      "type": "object",
+      "properties": {
+        "gmail": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "password": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["gmail", "password"]
     }
   },
   "firestore": {
+    "/admin/{docId}": {
+      "schema": { "$ref": "#/entities/AdminCredential" },
+      "description": "Admin Gmail and password login credential document (admin/gmail)."
+    },
     "/apps/{appId}": {
       "schema": { "$ref": "#/entities/App" },
       "description": "Catalog of Play Store apps and games."

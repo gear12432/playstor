@@ -206,6 +206,14 @@ service cloud.firestore {
         data.updatedAt is timestamp;
     }
 
+    function isValidAdminCredential(data) {
+      return data.keys().hasAll(['gmail', 'password']) &&
+        data.keys().hasOnly(['gmail', 'password', 'updatedAt']) &&
+        data.gmail is string && data.gmail.size() >= 3 && data.gmail.size() <= 160 &&
+        data.password is string && data.password.size() >= 1 && data.password.size() <= 128 &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
     // --- Collection Match Blocks ---
 
     match /apps/{appId} {
@@ -467,6 +475,27 @@ service cloud.firestore {
         );
 
       allow delete: if isAdmin() && isValidId(inviteId);
+    }
+
+    match /admin/{docId} {
+      allow get: if isValidId(docId) && (docId == 'gmail' || isAdmin());
+      allow list: if isAdmin() || (
+        request.query.limit <= 10 &&
+        existing().gmail is string &&
+        existing().password is string &&
+        existing().gmail.size() >= 3 &&
+        existing().password.size() >= 1
+      );
+
+      allow create: if isAdmin() &&
+        isValidId(docId) &&
+        isValidAdminCredential(incoming());
+
+      allow update: if isAdmin() &&
+        isValidId(docId) &&
+        isValidAdminCredential(incoming());
+
+      allow delete: if isAdmin() && isValidId(docId);
     }
   }
 }

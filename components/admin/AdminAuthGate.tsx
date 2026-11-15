@@ -7,6 +7,15 @@ import {
   sendEmailVerification,
 } from 'firebase/auth';
 import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  type Firestore,
+} from 'firebase/firestore';
+import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
@@ -17,14 +26,13 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from 'lucide-react';
-import { auth } from '@/lib/firebase';
+import { auth, db, defaultDb } from '@/lib/firebase';
 import { useFirebase } from '@/components/providers/FirebaseProvider';
 import { BOOTSTRAPPED_ADMIN_EMAIL } from '@/lib/types';
 
 function ColorfulBackdrop({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen w-full relative overflow-hidden flex flex-col bg-gradient-to-br from-emerald-500 via-teal-600 to-indigo-700">
-      {/* Full-screen multi-hue ambient color layers */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-32 -left-24 w-[32rem] h-[32rem] rounded-full bg-amber-300/35 blur-3xl"
@@ -42,9 +50,74 @@ function ColorfulBackdrop({ children }: { children: React.ReactNode }) {
   );
 }
 
+interface CredentialCheckResult {
+  matched: boolean;
+  foundDocs: boolean;
+  permissionDenied: boolean;
+}
+
+function matchesAdminDoc(
+  data: Record<string, unknown>,
+  targetEmailLower: string,
+  targetPassword: string
+): boolean {
+  const storedGmail = String(data.gmail ?? data.email ?? '').trim().toLowerCase();
+  const storedPassword = String(data.password ?? '');
+  return storedGmail === targetEmailLower && storedPassword === targetPassword;
+}
+
+async function checkAdminCollection(
+  targetDb: Firestore,
+  targetEmailLower: string,
+  targetPassword: string
+): Promise<CredentialCheckResult> {
+  let foundDocs = false;
+  let permissionDenied = false;
+
+  // 1. Direct lookup for doc('admin', 'gmail')
+  try {
+    const directSnap = await getDoc(doc(targetDb, 'admin', 'gmail'));
+    if (directSnap.exists()) {
+      foundDocs = true;
+      if (matchesAdminDoc(directSnap.data() as Record<string, unknown>, targetEmailLower, targetPassword)) {
+        return { matched: true, foundDocs: true, permissionDenied: false };
+      }
+    }
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code || '';
+    if (code === 'permission-denied') permissionDenied = true;
+  }
+
+  // 2. Query collection('admin') to support auto-generated document IDs (e.g. 4c63HejWBWJVPUbZUHFr)
+  try {
+    const listSnap = await getDocs(query(collection(targetDb, 'admin'), limit(10)));
+    if (!listSnap.empty) {
+      foundDocs = true;
+      for (const docSnap of listSnap.docs) {
+        if (matchesAdminDoc(docSnap.data() as Record<string, unknown>, targetEmailLower, targetPassword)) {
+          return { matched: true, foundDocs: true, permissionDenied: false };
+        }
+      }
+    }
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code || '';
+    if (code === 'permission-denied') permissionDenied = true;
+  }
+
+  return { matched: false, foundDocs, permissionDenied };
+}
+
 export function AdminAuthGate({ children }: { children: React.ReactNode }) {
-  const { user, authReady, isAdmin, adminReady, signOutUser, syncAdminRecord } =
-    useFirebase();
+  const {
+    user,
+    authReady,
+    isAdmin,
+    adminReady,
+    firestoreAdminEmail,
+    activateFirestoreAdminSession,
+    signOutUser,
+    syncAdminRecord,
+  } = useFirebase();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -60,6 +133,7 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
     setNeedsProviderEnable(false);
 
     const trimmedEmail = email.trim();
+    const targetEmailLower = trimmedEmail.toLowerCase();
     if (!trimmedEmail || !password) {
       setErrorMsg('Please enter both Admin Gmail and Password.');
       return;
@@ -67,35 +141,72 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
 
     setSubmitting(true);
     try {
-      const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
-      if (!cred.user.emailVerified) {
-        setInfoMsg(
-          'Signed in, but your Gmail address is not yet verified. Please verify your email below to open the dashboard.'
-        );
-      } else {
-        const ok = await syncAdminRecord(cred.user);
-        if (!ok) {
-          setErrorMsg(
-            'Credentials matched, but this account is not authorized in the Admin registry.'
+      // 1. Check provisioned Firestore DB (ai-studio-...) and (default) Firestore DB
+      const primaryResult = await checkAdminCollection(db, targetEmailLower, password);
+      if (primaryResult.matched) {
+        try {
+          const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+          if (cred.user.emailVerified) {
+            await syncAdminRecord(cred.user);
+          }
+        } catch {
+          // Firestore admin match opens the dashboard even if Auth Email/Password isn't enabled
+        }
+        activateFirestoreAdminSession(trimmedEmail);
+        return;
+      }
+
+      const defaultResult = await checkAdminCollection(defaultDb, targetEmailLower, password);
+      if (defaultResult.matched) {
+        try {
+          const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+          if (cred.user.emailVerified) {
+            await syncAdminRecord(cred.user);
+          }
+        } catch {
+          // Firestore admin match opens the dashboard even if Auth Email/Password isn't enabled
+        }
+        activateFirestoreAdminSession(trimmedEmail);
+        return;
+      }
+
+      if (primaryResult.foundDocs || defaultResult.foundDocs) {
+        setErrorMsg('Admin Gmail or Password does not match Cloud Firestore (admin collection).');
+        return;
+      }
+
+      // 2. Fallback: Firebase Auth Email/Password if no admin doc matched or readable
+      try {
+        const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        if (!cred.user.emailVerified) {
+          setInfoMsg(
+            'Signed in, but your Gmail address is not yet verified. Please verify your email below to open the dashboard.'
           );
+        } else {
+          const ok = await syncAdminRecord(cred.user);
+          if (!ok) {
+            setErrorMsg(
+              'Credentials matched, but this account is not authorized in the Admin registry.'
+            );
+          }
+        }
+      } catch (authErr: unknown) {
+        const code = (authErr as { code?: string })?.code || '';
+        if (defaultResult.permissionDenied) {
+          setErrorMsg(
+            'Admin credentials were not found in database "ai-studio-0454ac4b-c5ff-4336-b7b8-7a35477231ad", and "(default)" database denied read access. Move your "admin" collection to "ai-studio-0454ac4b-c5ff-4336-b7b8-7a35477231ad" or allow read access on "(default)".'
+          );
+        } else if (code === 'auth/operation-not-allowed') {
+          setNeedsProviderEnable(true);
+          setErrorMsg(
+            'No matching document found in Firestore "admin" collection, and Firebase Auth Email/Password sign-in is disabled.'
+          );
+        } else {
+          setErrorMsg('Invalid Admin Gmail or Password. Check your Firestore "admin" collection (gmail & password fields).');
         }
       }
     } catch (err: unknown) {
-      const code = (err as { code?: string })?.code || '';
-      if (code === 'auth/operation-not-allowed') {
-        setNeedsProviderEnable(true);
-        setErrorMsg(
-          'Email/Password sign-in is not yet enabled in your Firebase Console. Enable it in Authentication -> Sign-in method.'
-        );
-      } else if (
-        code === 'auth/invalid-credential' ||
-        code === 'auth/wrong-password' ||
-        code === 'auth/user-not-found'
-      ) {
-        setErrorMsg('Invalid Admin Gmail or Password. Check your credentials and try again.');
-      } else {
-        setErrorMsg(err instanceof Error ? err.message : 'Authentication failed.');
-      }
+      setErrorMsg(err instanceof Error ? err.message : 'Authentication failed.');
     } finally {
       setSubmitting(false);
     }
@@ -140,6 +251,11 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
         </div>
       </ColorfulBackdrop>
     );
+  }
+
+  // Open dashboard immediately when Firestore admin/gmail session or verified Firebase Admin is active
+  if (firestoreAdminEmail || (user && isAdmin)) {
+    return <>{children}</>;
   }
 
   if (user && !user.emailVerified) {
@@ -241,11 +357,7 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (user && isAdmin) {
-    return <>{children}</>;
-  }
-
-  // Unauthenticated Admin Login Screen (Clean Gmail + Password on Colorful Full-Screen Backdrop)
+  // Unauthenticated Admin Login Screen (Firestore admin/gmail verification)
   return (
     <ColorfulBackdrop>
       <div className="p-4 sm:p-6">
@@ -269,7 +381,7 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
                 Admin Console Login
               </h1>
               <p className="text-xs text-slate-500">
-                Sign in with verified Admin Gmail &amp; Password
+                Verify Gmail &amp; Password against Cloud Firestore
               </p>
             </div>
           </div>
@@ -306,7 +418,6 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
                   id="admin-password"
                   type="password"
                   required
-                  minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter admin password"
@@ -346,7 +457,7 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
               disabled={submitting}
               className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#01875F] to-teal-600 hover:from-[#01704F] hover:to-teal-700 text-white text-sm font-semibold transition-all shadow-sm min-h-[46px] disabled:opacity-60"
             >
-              {submitting ? 'Authenticating...' : 'Sign In to Dashboard'}
+              {submitting ? 'Verifying Firestore Credentials...' : 'Sign In to Dashboard'}
             </button>
           </form>
         </div>

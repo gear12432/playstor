@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useSyncExternalStore } from 'react';
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -36,6 +36,9 @@ interface FirebaseContextValue {
   userProfile: UserPublic | null;
   isAdmin: boolean;
   adminReady: boolean;
+  firestoreAdminEmail: string | null;
+  activateFirestoreAdminSession: (gmail: string) => void;
+  clearFirestoreAdminSession: () => void;
   apps: StoreApp[];
   appsLoading: boolean;
   storeError: string | null;
@@ -49,6 +52,27 @@ interface FirebaseContextValue {
   toggleWishlist: (app: StoreApp) => Promise<void>;
 }
 
+const ADMIN_SESSION_KEY = 'appvolt_firestore_admin_email';
+const adminSessionListeners = new Set<() => void>();
+
+function subscribeAdminSession(cb: () => void) {
+  adminSessionListeners.add(cb);
+  return () => adminSessionListeners.delete(cb);
+}
+
+function getAdminSessionSnapshot(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage.getItem(ADMIN_SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function getAdminSessionServerSnapshot(): string | null {
+  return null;
+}
+
 const FirebaseContext = createContext<FirebaseContextValue | null>(null);
 
 export function emailToInviteKey(email: string): string {
@@ -59,8 +83,34 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [userProfile, setUserProfile] = useState<UserPublic | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [firebaseAdmin, setFirebaseAdmin] = useState(false);
   const [adminReady, setAdminReady] = useState(false);
+  const firestoreAdminEmail = useSyncExternalStore(
+    subscribeAdminSession,
+    getAdminSessionSnapshot,
+    getAdminSessionServerSnapshot
+  );
+  const isAdmin = firebaseAdmin || Boolean(firestoreAdminEmail);
+
+  const activateFirestoreAdminSession = useCallback((gmail: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.sessionStorage.setItem(ADMIN_SESSION_KEY, gmail);
+      adminSessionListeners.forEach((cb) => cb());
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  const clearFirestoreAdminSession = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.sessionStorage.removeItem(ADMIN_SESSION_KEY);
+      adminSessionListeners.forEach((cb) => cb());
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
 
   const [apps, setApps] = useState<StoreApp[]>([]);
   const [appsLoading, setAppsLoading] = useState(true);
@@ -132,7 +182,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   const syncAdminRecord = useCallback(async (firebaseUser: User): Promise<boolean> => {
     if (!firebaseUser.emailVerified || !firebaseUser.email) {
-      setIsAdmin(false);
+      setFirebaseAdmin(false);
       setAdminReady(true);
       return false;
     }
@@ -141,7 +191,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     try {
       const adminSnap = await getDoc(adminRef);
       if (adminSnap.exists()) {
-        setIsAdmin(true);
+        setFirebaseAdmin(true);
         setAdminReady(true);
         return true;
       }
@@ -156,7 +206,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-        setIsAdmin(true);
+        setFirebaseAdmin(true);
         setAdminReady(true);
         return true;
       }
@@ -179,19 +229,19 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
             updatedAt: serverTimestamp(),
           });
         }
-        setIsAdmin(true);
+        setFirebaseAdmin(true);
         setAdminReady(true);
         return true;
       }
 
-      setIsAdmin(false);
+      setFirebaseAdmin(false);
       setAdminReady(true);
       return false;
     } catch {
       const isBootstrap =
         firebaseUser.emailVerified &&
         firebaseUser.email.toLowerCase() === BOOTSTRAPPED_ADMIN_EMAIL.toLowerCase();
-      setIsAdmin(isBootstrap);
+      setFirebaseAdmin(isBootstrap);
       setAdminReady(true);
       return isBootstrap;
     }
@@ -205,7 +255,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
       if (!nextUser) {
         setUserProfile(null);
-        setIsAdmin(false);
+        setFirebaseAdmin(false);
         setAdminReady(true);
         setLibraryMap({});
         return;
@@ -310,8 +360,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   }, [ensureUserProfile, syncAdminRecord]);
 
   const signOutUser = useCallback(async () => {
+    clearFirestoreAdminSession();
     await signOut(auth);
-  }, []);
+  }, [clearFirestoreAdminSession]);
 
   const recordAppDownload = useCallback(
     async (app: StoreApp) => {
@@ -431,6 +482,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         userProfile,
         isAdmin,
         adminReady,
+        firestoreAdminEmail,
+        activateFirestoreAdminSession,
+        clearFirestoreAdminSession,
         apps,
         appsLoading,
         storeError,

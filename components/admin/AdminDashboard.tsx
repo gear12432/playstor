@@ -96,7 +96,7 @@ const INITIAL_FORM = {
 };
 
 export function AdminDashboard() {
-  const { user, signOutUser } = useFirebase();
+  const { user, firestoreAdminEmail, signInWithGoogle, signOutUser } = useFirebase();
 
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -130,8 +130,11 @@ export function AdminDashboard() {
   const [newCatGroup, setNewCatGroup] = useState<AppCategoryGroup>('Apps');
   const [newCatOrder, setNewCatOrder] = useState('10');
 
-  // Admin Invite Form state
+  // Admin Invite & admin/gmail Credential Form state
   const [inviteEmail, setInviteEmail] = useState('');
+  const [credGmail, setCredGmail] = useState('');
+  const [credPassword, setCredPassword] = useState('');
+  const [savingCred, setSavingCred] = useState(false);
 
   const notify = (type: 'ok' | 'err', text: string) => {
     setStatusBanner({ type, text });
@@ -270,7 +273,11 @@ export function AdminDashboard() {
   }, [allUsers, userSearch]);
 
   const handleSeedCatalog = async () => {
-    if (!user || seeding) return;
+    if (seeding) return;
+    if (!user) {
+      notify('err', 'Click "Authorize Write Session" above to publish apps to Cloud Firestore.');
+      return;
+    }
     setSeeding(true);
     try {
       const batch = writeBatch(db);
@@ -334,7 +341,10 @@ export function AdminDashboard() {
 
   const handleSaveApp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      notify('err', 'Click "Authorize Write Session" above to save apps to Cloud Firestore.');
+      return;
+    }
 
     const cleanName = form.name.trim();
     const cleanPkg = form.packageName.trim();
@@ -554,7 +564,10 @@ export function AdminDashboard() {
 
   const handleInviteAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      notify('err', 'Click "Authorize Write Session" above to invite admin accounts.');
+      return;
+    }
     const trimmed = inviteEmail.trim().toLowerCase();
     if (!trimmed || !trimmed.includes('@')) {
       notify('err', 'Enter a valid Gmail address.');
@@ -593,6 +606,30 @@ export function AdminDashboard() {
       await deleteDoc(doc(db, 'apps', rev.appId, 'reviews', rev.id));
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `apps/${rev.appId}/reviews/${rev.id}`);
+    }
+  };
+
+  const handleSaveAdminCredential = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanGmail = credGmail.trim();
+    if (!cleanGmail || !credPassword) {
+      notify('err', 'Enter both Gmail and Password for admin/gmail.');
+      return;
+    }
+    setSavingCred(true);
+    try {
+      await setDoc(doc(db, 'admin', 'gmail'), {
+        gmail: cleanGmail,
+        password: credPassword,
+        updatedAt: serverTimestamp(),
+      });
+      notify('ok', 'Updated Cloud Firestore admin/gmail credentials.');
+      setCredPassword('');
+    } catch (err) {
+      notify('err', 'Could not update admin/gmail. Ensure write session is authorized.');
+      handleFirestoreError(err, OperationType.WRITE, 'admin/gmail');
+    } finally {
+      setSavingCred(false);
     }
   };
 
@@ -644,8 +681,10 @@ export function AdminDashboard() {
 
         <div className="p-4 border-t border-slate-800 space-y-3">
           <div className="text-xs">
-            <p className="font-semibold text-white truncate">{user?.displayName || 'Admin'}</p>
-            <p className="text-slate-400 truncate">{user?.email}</p>
+            <p className="font-semibold text-white truncate">
+              {user?.displayName || (firestoreAdminEmail ? 'Firestore Admin' : 'Admin')}
+            </p>
+            <p className="text-slate-400 truncate">{user?.email || firestoreAdminEmail}</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -748,6 +787,21 @@ export function AdminDashboard() {
         </header>
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+          {firestoreAdminEmail && !user && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm text-amber-900">
+              <span>
+                Signed in via Firestore <strong className="font-mono-num">admin/gmail</strong> ({firestoreAdminEmail}). Link a verified Firebase Auth session to publish or edit Firestore records.
+              </span>
+              <button
+                type="button"
+                onClick={() => signInWithGoogle()}
+                className="px-3.5 py-1.5 rounded-lg bg-amber-900 text-white text-xs font-semibold hover:bg-amber-800 shrink-0"
+              >
+                Authorize Write Session
+              </button>
+            </div>
+          )}
+
           {statusBanner && (
             <div
               className={`rounded-xl px-4 py-3 text-sm font-medium border flex items-center justify-between ${
@@ -1688,6 +1742,42 @@ export function AdminDashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4 lg:col-span-2">
+                <div>
+                  <h2 className="font-display text-base font-bold text-slate-900">
+                    Firestore Login Credential (admin / gmail)
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Update the <span className="font-mono-num">gmail</span> and <span className="font-mono-num">password</span> stored in Cloud Firestore document <span className="font-mono-num">admin/gmail</span>.
+                  </p>
+                </div>
+                <form onSubmit={handleSaveAdminCredential} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <input
+                    type="email"
+                    required
+                    value={credGmail}
+                    onChange={(e) => setCredGmail(e.target.value)}
+                    placeholder="Admin Gmail (e.g. skjiyaul842@gmail.com)"
+                    className="px-3 py-2 text-sm border border-slate-200 rounded-lg"
+                  />
+                  <input
+                    type="password"
+                    required
+                    value={credPassword}
+                    onChange={(e) => setCredPassword(e.target.value)}
+                    placeholder="New Admin Password"
+                    className="px-3 py-2 text-sm border border-slate-200 rounded-lg"
+                  />
+                  <button
+                    type="submit"
+                    disabled={savingCred}
+                    className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    {savingCred ? 'Saving...' : 'Save admin/gmail'}
+                  </button>
+                </form>
               </div>
             </div>
           )}
