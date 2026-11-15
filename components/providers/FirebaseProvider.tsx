@@ -23,7 +23,7 @@ import { auth, db, googleProvider, testFirestoreConnection } from '@/lib/firebas
 import { handleFirestoreError, logFirestoreError, OperationType } from '@/lib/firestore-errors';
 import { triggerApkFileDownload } from '@/lib/apk-downloader';
 import {
-  BOOTSTRAPPED_ADMIN_EMAIL,
+  BOOTSTRAPPED_ADMIN_EMAILS,
   type LibraryItem,
   type StoreApp,
   type StoreCategory,
@@ -197,7 +197,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       }
 
       const lowerEmail = firebaseUser.email.toLowerCase();
-      if (lowerEmail === BOOTSTRAPPED_ADMIN_EMAIL.toLowerCase()) {
+      const isBootstrapEmail = BOOTSTRAPPED_ADMIN_EMAILS.some(
+        (e) => e.toLowerCase() === lowerEmail
+      );
+      if (isBootstrapEmail) {
         await setDoc(adminRef, {
           uid: firebaseUser.uid,
           email: firebaseUser.email.slice(0, 160),
@@ -238,9 +241,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setAdminReady(true);
       return false;
     } catch {
+      const lower = firebaseUser.email.toLowerCase();
       const isBootstrap =
         firebaseUser.emailVerified &&
-        firebaseUser.email.toLowerCase() === BOOTSTRAPPED_ADMIN_EMAIL.toLowerCase();
+        BOOTSTRAPPED_ADMIN_EMAILS.some((e) => e.toLowerCase() === lower);
       setFirebaseAdmin(isBootstrap);
       setAdminReady(true);
       return isBootstrap;
@@ -351,12 +355,33 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
-    const cred = await signInWithPopup(auth, googleProvider);
-    if (cred.user.emailVerified) {
-      await ensureUserProfile(cred.user);
-      await syncAdminRecord(cred.user);
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      if (cred.user.emailVerified) {
+        try {
+          await ensureUserProfile(cred.user);
+        } catch (profileErr) {
+          logFirestoreError(profileErr, OperationType.WRITE, `users/${cred.user.uid}`);
+        }
+        await syncAdminRecord(cred.user);
+      }
+      return cred.user;
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || '';
+      if (code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+        throw new Error(
+          `Add "${host}" to Firebase Console → Authentication → Settings → Authorized domains to enable Google Sign-In here.`
+        );
+      }
+      if (code === 'auth/popup-blocked') {
+        throw new Error('Sign-in popup was blocked by your browser. Please allow popups and try again.');
+      }
+      if (code === 'auth/popup-closed-by-user') {
+        throw new Error('Google sign-in popup was closed before completing login.');
+      }
+      throw err;
     }
-    return cred.user;
   }, [ensureUserProfile, syncAdminRecord]);
 
   const signOutUser = useCallback(async () => {

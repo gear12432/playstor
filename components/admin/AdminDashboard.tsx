@@ -31,12 +31,14 @@ import {
   doc,
   getDoc,
   onSnapshot,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, defaultDb } from '@/lib/firebase';
 import { handleFirestoreError, logFirestoreError, OperationType } from '@/lib/firestore-errors';
 import { emailToInviteKey, useFirebase } from '@/components/providers/FirebaseProvider';
 import { AppIcon, ICON_PRESETS } from '@/components/AppArtwork';
@@ -141,23 +143,29 @@ export function AdminDashboard() {
     setTimeout(() => setStatusBanner(null), 5000);
   };
 
-  // Attach real-time Firestore listeners for Admin
+  // Attach real-time Firestore listeners for Admin (re-runs when Firebase Auth user links)
   useEffect(() => {
+    const appsSource = user
+      ? collection(db, 'apps')
+      : query(collection(db, 'apps'), where('status', '==', 'published'));
+
     const unsubApps = onSnapshot(
-      collection(db, 'apps'),
+      appsSource,
       (snap) => {
         const list = snap.docs.map((d) => d.data() as StoreApp);
         list.sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0));
         setAllApps(list);
-        if (!selectedReviewAppId && list.length > 0) {
-          setSelectedReviewAppId(list[0].id);
-        }
+        setSelectedReviewAppId((prev) => prev || list[0]?.id || '');
       },
       (err) => logFirestoreError(err, OperationType.LIST, 'apps')
     );
 
+    const catsSource = user
+      ? collection(db, 'categories')
+      : query(collection(db, 'categories'), where('active', '==', true));
+
     const unsubCats = onSnapshot(
-      collection(db, 'categories'),
+      catsSource,
       (snap) => {
         const list = snap.docs.map((d) => d.data() as StoreCategory);
         list.sort((a, b) => a.sortOrder - b.sortOrder);
@@ -165,6 +173,13 @@ export function AdminDashboard() {
       },
       (err) => logFirestoreError(err, OperationType.LIST, 'categories')
     );
+
+    if (!user) {
+      return () => {
+        unsubApps();
+        unsubCats();
+      };
+    }
 
     const unsubUsers = onSnapshot(
       collection(db, 'users'),
@@ -224,13 +239,19 @@ export function AdminDashboard() {
       unsubAdmins();
       unsubInvites();
     };
-  }, [selectedReviewAppId]);
+  }, [user]);
 
   // Real-time reviews for selected app in Reviews tab
   useEffect(() => {
     if (!selectedReviewAppId) return;
+    const reviewsSource = user
+      ? collection(db, 'apps', selectedReviewAppId, 'reviews')
+      : query(
+          collection(db, 'apps', selectedReviewAppId, 'reviews'),
+          where('status', '==', 'visible')
+        );
     const unsub = onSnapshot(
-      collection(db, 'apps', selectedReviewAppId, 'reviews'),
+      reviewsSource,
       (snap) => {
         const list = snap.docs.map((d) => d.data() as AppReview);
         list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
@@ -239,7 +260,7 @@ export function AdminDashboard() {
       (err) => logFirestoreError(err, OperationType.LIST, `apps/${selectedReviewAppId}/reviews`)
     );
     return () => unsub();
-  }, [selectedReviewAppId]);
+  }, [user, selectedReviewAppId]);
 
   const visibleReviews = selectedReviewAppId ? appReviews : [];
 
@@ -454,7 +475,16 @@ export function AdminDashboard() {
     }
   };
 
+  const requireWriteUser = () => {
+    if (!user) {
+      notify('err', 'Click "Authorize Write Session" above to save changes to Cloud Firestore.');
+      return false;
+    }
+    return true;
+  };
+
   const handleToggleAppField = async (app: StoreApp, field: 'featured' | 'status') => {
+    if (!requireWriteUser()) return;
     try {
       const appRef = doc(db, 'apps', app.id);
       if (field === 'featured') {
@@ -469,6 +499,7 @@ export function AdminDashboard() {
   };
 
   const handleDeleteApp = async (app: StoreApp) => {
+    if (!requireWriteUser()) return;
     try {
       await deleteDoc(doc(db, 'apps', app.id));
       notify('ok', `Deleted "${app.name}" from store catalog.`);
@@ -479,6 +510,7 @@ export function AdminDashboard() {
 
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!requireWriteUser()) return;
     const clean = newCatName.trim();
     if (clean.length < 2 || clean.length > 40) return;
     const catId = `cat-${clean.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
@@ -500,6 +532,7 @@ export function AdminDashboard() {
   };
 
   const handleToggleCategory = async (cat: StoreCategory) => {
+    if (!requireWriteUser()) return;
     try {
       await updateDoc(doc(db, 'categories', cat.id), {
         active: !cat.active,
@@ -511,6 +544,7 @@ export function AdminDashboard() {
   };
 
   const handleDeleteCategory = async (cat: StoreCategory) => {
+    if (!requireWriteUser()) return;
     try {
       await deleteDoc(doc(db, 'categories', cat.id));
     } catch (err) {
@@ -591,6 +625,7 @@ export function AdminDashboard() {
   };
 
   const handleToggleReviewVisibility = async (rev: AppReview) => {
+    if (!requireWriteUser()) return;
     try {
       await updateDoc(doc(db, 'apps', rev.appId, 'reviews', rev.id), {
         status: rev.status === 'visible' ? 'hidden' : 'visible',
@@ -602,6 +637,7 @@ export function AdminDashboard() {
   };
 
   const handleDeleteReview = async (rev: AppReview) => {
+    if (!requireWriteUser()) return;
     try {
       await deleteDoc(doc(db, 'apps', rev.appId, 'reviews', rev.id));
     } catch (err) {
@@ -617,19 +653,44 @@ export function AdminDashboard() {
       return;
     }
     setSavingCred(true);
+    let savedDefault = false;
+    let savedPrimary = false;
+
     try {
-      await setDoc(doc(db, 'admin', 'gmail'), {
+      await setDoc(doc(defaultDb, 'admin', 'gmail'), {
         gmail: cleanGmail,
         password: credPassword,
         updatedAt: serverTimestamp(),
       });
-      notify('ok', 'Updated Cloud Firestore admin/gmail credentials.');
+      savedDefault = true;
+    } catch {
+      // (default) database may have restricted rules
+    }
+
+    if (user) {
+      try {
+        await setDoc(doc(db, 'admin', 'gmail'), {
+          gmail: cleanGmail,
+          password: credPassword,
+          updatedAt: serverTimestamp(),
+        });
+        savedPrimary = true;
+      } catch (err) {
+        if (!savedDefault) {
+          notify('err', 'Could not update admin/gmail. Ensure write session is authorized.');
+          setSavingCred(false);
+          handleFirestoreError(err, OperationType.WRITE, 'admin/gmail');
+          return;
+        }
+      }
+    }
+
+    setSavingCred(false);
+    if (savedPrimary || savedDefault) {
+      notify('ok', 'Saved admin Gmail & password to Cloud Firestore.');
       setCredPassword('');
-    } catch (err) {
-      notify('err', 'Could not update admin/gmail. Ensure write session is authorized.');
-      handleFirestoreError(err, OperationType.WRITE, 'admin/gmail');
-    } finally {
-      setSavingCred(false);
+    } else {
+      notify('err', 'Click "Authorize Write Session" above to save admin/gmail credentials.');
     }
   };
 

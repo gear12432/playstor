@@ -13,6 +13,7 @@ import {
   getDocs,
   limit,
   query,
+  where,
   type Firestore,
 } from 'firebase/firestore';
 import {
@@ -68,9 +69,11 @@ function matchesAdminDoc(
 
 async function checkAdminCollection(
   targetDb: Firestore,
-  targetEmailLower: string,
-  targetPassword: string
+  rawEmail: string,
+  targetPassword: string,
+  allowUnfilteredScan: boolean
 ): Promise<CredentialCheckResult> {
+  const targetEmailLower = rawEmail.toLowerCase();
   let foundDocs = false;
   let permissionDenied = false;
 
@@ -88,20 +91,42 @@ async function checkAdminCollection(
     if (code === 'permission-denied') permissionDenied = true;
   }
 
-  // 2. Query collection('admin') to support auto-generated document IDs (e.g. 4c63HejWBWJVPUbZUHFr)
-  try {
-    const listSnap = await getDocs(query(collection(targetDb, 'admin'), limit(10)));
-    if (!listSnap.empty) {
-      foundDocs = true;
-      for (const docSnap of listSnap.docs) {
-        if (matchesAdminDoc(docSnap.data() as Record<string, unknown>, targetEmailLower, targetPassword)) {
-          return { matched: true, foundDocs: true, permissionDenied: false };
+  // 2. Exact filtered query (gmail + password) — works on both strict Firestore Rules & auto-ID docs
+  const emailCandidates = rawEmail === targetEmailLower ? [rawEmail] : [rawEmail, targetEmailLower];
+  for (const candidate of emailCandidates) {
+    try {
+      const q = query(
+        collection(targetDb, 'admin'),
+        where('gmail', '==', candidate),
+        where('password', '==', targetPassword),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return { matched: true, foundDocs: true, permissionDenied: false };
+      }
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || '';
+      if (code === 'permission-denied') permissionDenied = true;
+    }
+  }
+
+  // 3. Optional bounded scan for case-insensitive gmail or `email` alias on open (default) DB
+  if (allowUnfilteredScan) {
+    try {
+      const listSnap = await getDocs(query(collection(targetDb, 'admin'), limit(10)));
+      if (!listSnap.empty) {
+        foundDocs = true;
+        for (const docSnap of listSnap.docs) {
+          if (matchesAdminDoc(docSnap.data() as Record<string, unknown>, targetEmailLower, targetPassword)) {
+            return { matched: true, foundDocs: true, permissionDenied: false };
+          }
         }
       }
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || '';
+      if (code === 'permission-denied') permissionDenied = true;
     }
-  } catch (err: unknown) {
-    const code = (err as { code?: string })?.code || '';
-    if (code === 'permission-denied') permissionDenied = true;
   }
 
   return { matched: false, foundDocs, permissionDenied };
@@ -133,7 +158,6 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
     setNeedsProviderEnable(false);
 
     const trimmedEmail = email.trim();
-    const targetEmailLower = trimmedEmail.toLowerCase();
     if (!trimmedEmail || !password) {
       setErrorMsg('Please enter both Admin Gmail and Password.');
       return;
@@ -142,7 +166,7 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
     setSubmitting(true);
     try {
       // 1. Check provisioned Firestore DB (ai-studio-...) and (default) Firestore DB
-      const primaryResult = await checkAdminCollection(db, targetEmailLower, password);
+      const primaryResult = await checkAdminCollection(db, trimmedEmail, password, false);
       if (primaryResult.matched) {
         try {
           const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
@@ -156,7 +180,7 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const defaultResult = await checkAdminCollection(defaultDb, targetEmailLower, password);
+      const defaultResult = await checkAdminCollection(defaultDb, trimmedEmail, password, true);
       if (defaultResult.matched) {
         try {
           const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);

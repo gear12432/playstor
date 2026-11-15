@@ -28,6 +28,10 @@ export const APP_CONSTRAINTS = {
 } as const;
 
 export const BOOTSTRAPPED_ADMIN_EMAIL = 'skjiyaul842@gmail.com';
+export const BOOTSTRAPPED_ADMIN_EMAILS = [
+  'skjiyaul842@gmail.com',
+  'gkappstor@gmail.com',
+] as const;
 
 export interface StoreApp {
   id: string;

@@ -35,7 +35,8 @@ service cloud.firestore {
     function isAdmin() {
       return isVerifiedUser() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'skjiyaul842@gmail.com'
+        request.auth.token.email == 'skjiyaul842@gmail.com' ||
+        request.auth.token.email == 'gkappstor@gmail.com'
       );
     }
 
@@ -432,7 +433,10 @@ service cloud.firestore {
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time && (
           isAdmin() ||
-          (isOwner(adminId) && request.auth.token.email == 'skjiyaul842@gmail.com') ||
+          (isOwner(adminId) && (
+            request.auth.token.email == 'skjiyaul842@gmail.com' ||
+            request.auth.token.email == 'gkappstor@gmail.com'
+          )) ||
           (isOwner(adminId) && incoming().role == 'admin' && hasValidInvite())
         );
 

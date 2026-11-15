@@ -11,6 +11,7 @@ export function Navbar() {
   const { user, authReady, isAdmin, signInWithGoogle, signOutUser } = useFirebase();
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [authError, setAuthError] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,11 +25,14 @@ export function Navbar() {
   }, []);
 
   const handleGoogleLogin = async () => {
+    setAuthError('');
     setSigningIn(true);
     try {
       await signInWithGoogle();
     } catch (err) {
-      console.error('Google Sign-In error:', err);
+      setAuthError(
+        err instanceof Error ? err.message : 'Google Sign-In could not complete. Try again.'
+      );
     } finally {
       setSigningIn(false);
     }
@@ -44,6 +48,18 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
+      {authError && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900 flex items-center justify-between gap-3">
+          <span>{authError}</span>
+          <button
+            type="button"
+            onClick={() => setAuthError('')}
+            className="font-semibold underline shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-8">
         {/* Zone 1: Single-line Brand Wordmark */}
         <Link
