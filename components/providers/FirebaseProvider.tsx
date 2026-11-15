@@ -20,7 +20,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, testFirestoreConnection } from '@/lib/firebase';
-import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
+import { handleFirestoreError, logFirestoreError, OperationType } from '@/lib/firestore-errors';
 import { triggerApkFileDownload } from '@/lib/apk-downloader';
 import {
   BOOTSTRAPPED_ADMIN_EMAIL,
@@ -38,6 +38,7 @@ interface FirebaseContextValue {
   adminReady: boolean;
   apps: StoreApp[];
   appsLoading: boolean;
+  storeError: string | null;
   categories: StoreCategory[];
   libraryMap: Record<string, LibraryItem>;
   signInWithGoogle: () => Promise<User | null>;
@@ -63,6 +64,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   const [apps, setApps] = useState<StoreApp[]>([]);
   const [appsLoading, setAppsLoading] = useState(true);
+  const [storeError, setStoreError] = useState<string | null>(null);
   const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [libraryMap, setLibraryMap] = useState<Record<string, LibraryItem>>({});
 
@@ -232,7 +234,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+        logFirestoreError(error, OperationType.GET, `users/${user.uid}`);
       }
     );
 
@@ -248,7 +250,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setLibraryMap(nextMap);
       },
       (error) => {
-        handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/library`);
+        logFirestoreError(error, OperationType.LIST, `users/${user.uid}/library`);
       }
     );
 
@@ -267,11 +269,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         const list = snap.docs.map((d) => d.data() as StoreApp);
         list.sort((a, b) => (b.downloadCount || 0) - (a.downloadCount || 0));
         setApps(list);
+        setStoreError(null);
         setAppsLoading(false);
       },
       (error) => {
         setAppsLoading(false);
-        handleFirestoreError(error, OperationType.LIST, 'apps');
+        const msg = logFirestoreError(error, OperationType.LIST, 'apps');
+        setStoreError(msg);
       }
     );
 
@@ -289,7 +293,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setCategories(list);
       },
       (error) => {
-        handleFirestoreError(error, OperationType.LIST, 'categories');
+        logFirestoreError(error, OperationType.LIST, 'categories');
       }
     );
 
@@ -429,6 +433,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         adminReady,
         apps,
         appsLoading,
+        storeError,
         categories,
         libraryMap,
         signInWithGoogle,

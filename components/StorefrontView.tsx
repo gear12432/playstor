@@ -15,7 +15,7 @@ function StorefrontInner() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab');
 
-  const { apps, appsLoading, categories, user, signInWithGoogle } = useFirebase();
+  const { apps, appsLoading, storeError, categories, user, signInWithGoogle } = useFirebase();
 
   const [activeTab, setActiveTab] = useState<'All' | 'Apps' | 'Games' | 'Charts'>(
     initialTab === 'Apps' || initialTab === 'Games' || initialTab === 'Charts' ? initialTab : 'All'
@@ -120,6 +120,13 @@ function StorefrontInner() {
         </section>
       )}
 
+      {/* Non-blocking Firestore connectivity notice */}
+      {storeError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs sm:text-sm text-amber-800">
+          Unable to sync catalog in real time ({storeError}). Verify Firebase Firestore connectivity and authorized domain settings.
+        </div>
+      )}
+
       {/* Loading Skeleton */}
       {appsLoading && (
         <section className="space-y-8">
@@ -222,7 +229,7 @@ function StorefrontInner() {
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <InstallButton app={featuredApp} size="lg" />
                     <Link
-                      href={`/apps/${featuredApp.id}`}
+                      href={`/details?id=${featuredApp.id}`}
                       className="px-5 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition-colors inline-flex items-center gap-2 min-h-[44px]"
                     >
                       <span>App Details</span>
@@ -275,7 +282,7 @@ function StorefrontInner() {
                     className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all"
                   >
                     <Link
-                      href={`/apps/${app.id}`}
+                      href={`/details?id=${app.id}`}
                       className="flex items-center gap-3.5 min-w-0 flex-1"
                     >
                       <span className="w-6 text-center text-sm font-bold font-mono-num text-slate-400 shrink-0">
@@ -353,7 +360,7 @@ function StorefrontInner() {
                     key={app.id}
                     className="group rounded-xl border border-slate-200 bg-white p-5 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 transition-all flex flex-col justify-between gap-4"
                   >
-                    <Link href={`/apps/${app.id}`} className="flex items-start gap-4">
+                    <Link href={`/details?id=${app.id}`} className="flex items-start gap-4">
                       <AppIcon app={app} size="md" />
                       <div className="min-w-0 flex-1">
                         <h3 className="font-display text-base font-semibold text-slate-900 truncate group-hover:text-[#01875F] transition-colors">
@@ -384,7 +391,7 @@ function StorefrontInner() {
                       </span>
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/apps/${app.id}`}
+                          href={`/details?id=${app.id}`}
                           className="px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors"
                         >
                           Details

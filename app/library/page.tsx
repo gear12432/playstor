@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Bookmark, Download, CheckCircle2, ArrowRight, History } from 'lucide-react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
+import { logFirestoreError, OperationType } from '@/lib/firestore-errors';
 import { useFirebase } from '@/components/providers/FirebaseProvider';
 import { Navbar } from '@/components/Navbar';
 import { AppIcon } from '@/components/AppArtwork';
@@ -28,7 +28,7 @@ export default function LibraryPage() {
         setDownloads(list);
       },
       (error) => {
-        handleFirestoreError(error, OperationType.LIST, 'downloads');
+        logFirestoreError(error, OperationType.LIST, 'downloads');
       }
     );
 
@@ -112,7 +112,7 @@ export default function LibraryPage() {
                       key={app.id}
                       className="flex items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-white"
                     >
-                      <Link href={`/apps/${app.id}`} className="flex items-center gap-3.5 min-w-0">
+                      <Link href={`/details?id=${app.id}`} className="flex items-center gap-3.5 min-w-0">
                         <AppIcon app={app} size="md" />
                         <div className="min-w-0">
                           <h3 className="text-sm font-semibold text-slate-900 truncate">
@@ -151,7 +151,7 @@ export default function LibraryPage() {
                       key={app.id}
                       className="flex items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-white"
                     >
-                      <Link href={`/apps/${app.id}`} className="flex items-center gap-3.5 min-w-0">
+                      <Link href={`/details?id=${app.id}`} className="flex items-center gap-3.5 min-w-0">
                         <AppIcon app={app} size="md" />
                         <div className="min-w-0">
                           <h3 className="text-sm font-semibold text-slate-900 truncate">
@@ -205,7 +205,7 @@ export default function LibraryPage() {
                         <tr key={dl.id} className="hover:bg-slate-50/70">
                           <td className="px-4 py-3 font-medium text-slate-900">
                             <Link
-                              href={`/apps/${dl.appId}`}
+                              href={`/details?id=${dl.appId}`}
                               className="inline-flex items-center gap-2 hover:text-[#01875F]"
                             >
                               <Download className="w-3.5 h-3.5 text-[#01875F]" />

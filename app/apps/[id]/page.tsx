@@ -1,5 +1,10 @@
 import { Navbar } from '@/components/Navbar';
 import { AppDetailClient } from '@/components/AppDetailClient';
+import { STARTER_APPS } from '@/lib/seed-catalog';
+
+export function generateStaticParams() {
+  return STARTER_APPS.map((app) => ({ id: app.id }));
+}
 
 export default async function AppDetailPage({
   params,

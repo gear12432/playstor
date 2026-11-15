@@ -24,7 +24,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
+import { handleFirestoreError, logFirestoreError, OperationType } from '@/lib/firestore-errors';
 import { useFirebase } from '@/components/providers/FirebaseProvider';
 import { AppIcon, AppScreenshotPreview } from '@/components/AppArtwork';
 import { InstallButton } from '@/components/InstallButton';
@@ -58,7 +58,7 @@ export function AppDetailClient({ appId }: { appId: string }) {
       },
       (error) => {
         setLoading(false);
-        handleFirestoreError(error, OperationType.GET, `apps/${appId}`);
+        logFirestoreError(error, OperationType.GET, `apps/${appId}`);
       }
     );
 
@@ -78,7 +78,7 @@ export function AppDetailClient({ appId }: { appId: string }) {
         setReviews(list);
       },
       (error) => {
-        handleFirestoreError(error, OperationType.LIST, `apps/${appId}/reviews`);
+        logFirestoreError(error, OperationType.LIST, `apps/${appId}/reviews`);
       }
     );
 

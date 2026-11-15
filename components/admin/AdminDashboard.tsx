@@ -37,7 +37,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
+import { handleFirestoreError, logFirestoreError, OperationType } from '@/lib/firestore-errors';
 import { emailToInviteKey, useFirebase } from '@/components/providers/FirebaseProvider';
 import { AppIcon, ICON_PRESETS } from '@/components/AppArtwork';
 import { STARTER_APPS, STARTER_CATEGORIES } from '@/lib/seed-catalog';
@@ -150,7 +150,7 @@ export function AdminDashboard() {
           setSelectedReviewAppId(list[0].id);
         }
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'apps')
+      (err) => logFirestoreError(err, OperationType.LIST, 'apps')
     );
 
     const unsubCats = onSnapshot(
@@ -160,7 +160,7 @@ export function AdminDashboard() {
         list.sort((a, b) => a.sortOrder - b.sortOrder);
         setAllCategories(list);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'categories')
+      (err) => logFirestoreError(err, OperationType.LIST, 'categories')
     );
 
     const unsubUsers = onSnapshot(
@@ -184,7 +184,7 @@ export function AdminDashboard() {
         enriched.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
         setAllUsers(enriched);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'users')
+      (err) => logFirestoreError(err, OperationType.LIST, 'users')
     );
 
     const unsubDownloads = onSnapshot(
@@ -194,7 +194,7 @@ export function AdminDashboard() {
         list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
         setAllDownloads(list);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'downloads')
+      (err) => logFirestoreError(err, OperationType.LIST, 'downloads')
     );
 
     const unsubAdmins = onSnapshot(
@@ -202,7 +202,7 @@ export function AdminDashboard() {
       (snap) => {
         setAdminsList(snap.docs.map((d) => d.data() as AdminRecord));
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'admins')
+      (err) => logFirestoreError(err, OperationType.LIST, 'admins')
     );
 
     const unsubInvites = onSnapshot(
@@ -210,7 +210,7 @@ export function AdminDashboard() {
       (snap) => {
         setInvitesList(snap.docs.map((d) => d.data() as AdminInvite));
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'admin_invites')
+      (err) => logFirestoreError(err, OperationType.LIST, 'admin_invites')
     );
 
     return () => {
@@ -233,7 +233,7 @@ export function AdminDashboard() {
         list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
         setAppReviews(list);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, `apps/${selectedReviewAppId}/reviews`)
+      (err) => logFirestoreError(err, OperationType.LIST, `apps/${selectedReviewAppId}/reviews`)
     );
     return () => unsub();
   }, [selectedReviewAppId]);
