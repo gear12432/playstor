@@ -9,6 +9,7 @@ import { useFirebase } from '@/components/providers/FirebaseProvider';
 import { AppIcon, ICON_PRESETS } from '@/components/AppArtwork';
 import { InstallButton } from '@/components/InstallButton';
 import { formatDownloadCount } from '@/lib/apk-downloader';
+import { isRenderableImageSrc } from '@/lib/image-compress';
 import type { StoreApp } from '@/lib/types';
 
 function StorefrontInner() {
@@ -183,6 +184,15 @@ function StorefrontInner() {
               transition={{ duration: 0.25 }}
               className="relative overflow-hidden rounded-2xl bg-slate-950 text-white border border-slate-800"
             >
+              {isRenderableImageSrc(featuredApp.featureImageUrl) && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={featuredApp.featureImageUrl}
+                  alt={`${featuredApp.name} feature graphic`}
+                  referrerPolicy="no-referrer"
+                  className="absolute inset-0 w-full h-full object-cover opacity-35 pointer-events-none"
+                />
+              )}
               <div
                 className={`absolute inset-0 bg-gradient-to-br ${featuredPreset.bg} opacity-35 pointer-events-none`}
               />

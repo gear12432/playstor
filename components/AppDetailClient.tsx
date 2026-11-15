@@ -29,6 +29,7 @@ import { useFirebase } from '@/components/providers/FirebaseProvider';
 import { AppIcon, AppScreenshotPreview } from '@/components/AppArtwork';
 import { InstallButton } from '@/components/InstallButton';
 import { formatDownloadCount } from '@/lib/apk-downloader';
+import { isRenderableImageSrc } from '@/lib/image-compress';
 import { APP_CONSTRAINTS, type AppReview, type StoreApp } from '@/lib/types';
 
 export function AppDetailClient({ appId }: { appId: string }) {
@@ -286,6 +287,19 @@ export function AppDetailClient({ appId }: { appId: string }) {
           <p className="text-xs text-slate-500 font-mono-num">Version {app.version}</p>
         </div>
       </section>
+
+      {/* Feature Graphic Banner (when uploaded/set) */}
+      {isRenderableImageSrc(app.featureImageUrl) && (
+        <section className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={app.featureImageUrl}
+            alt={`${app.name} feature banner`}
+            referrerPolicy="no-referrer"
+            className="w-full max-h-72 object-cover"
+          />
+        </section>
+      )}
 
       {/* Screenshot Gallery */}
       <section className="space-y-4">

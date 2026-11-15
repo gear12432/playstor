@@ -68,7 +68,11 @@
         },
         "iconUrl": {
           "type": "string",
-          "maxLength": 500
+          "maxLength": 120000
+        },
+        "featureImageUrl": {
+          "type": "string",
+          "maxLength": 220000
         },
         "iconPreset": {
           "type": "string",

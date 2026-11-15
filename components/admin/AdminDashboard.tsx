@@ -20,6 +20,7 @@ import {
   Sparkles,
   Star,
   Trash2,
+  Upload,
   UserCheck,
   UserX,
   Users,
@@ -44,6 +45,7 @@ import { emailToInviteKey, useFirebase } from '@/components/providers/FirebasePr
 import { AppIcon, ICON_PRESETS } from '@/components/AppArtwork';
 import { STARTER_APPS, STARTER_CATEGORIES } from '@/lib/seed-catalog';
 import { formatDownloadCount } from '@/lib/apk-downloader';
+import { compressImageFileToDataUrl, isRenderableImageSrc } from '@/lib/image-compress';
 import {
   APP_CONSTRAINTS,
   type AdminInvite,
@@ -90,8 +92,11 @@ const INITIAL_FORM = {
   ageRating: '3+' as AgeRating,
   iconPreset: 'emerald-note',
   iconUrl: '',
+  featureImageUrl: '',
+  screenshot1: '',
+  screenshot2: '',
+  screenshot3: '',
   apkUrl: 'appvolt://packages/app-release.apk',
-  screenshotsText: 'screen:overview\nscreen:workspace',
   permissionsText: 'Network Access, Storage',
   featured: false,
   status: 'published' as AppStatus,
@@ -334,6 +339,7 @@ export function AdminDashboard() {
   };
 
   const openEditAppForm = (app: StoreApp) => {
+    const shots = app.screenshots || [];
     setEditingApp(app);
     setForm({
       id: app.id,
@@ -351,13 +357,77 @@ export function AdminDashboard() {
       ageRating: app.ageRating,
       iconPreset: app.iconPreset,
       iconUrl: app.iconUrl || '',
+      featureImageUrl: app.featureImageUrl || '',
+      screenshot1: shots[0] || '',
+      screenshot2: shots[1] || '',
+      screenshot3: shots[2] || '',
       apkUrl: app.apkUrl,
-      screenshotsText: (app.screenshots || []).join('\n'),
       permissionsText: (app.permissions || []).join(', '),
       featured: app.featured,
       status: app.status,
     });
     setActiveTab('publish');
+  };
+
+  const handleIconFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const dataUrl = await compressImageFileToDataUrl(file, {
+        maxWidth: 256,
+        maxHeight: 256,
+        maxChars: APP_CONSTRAINTS.ICON_URL_MAX,
+      });
+      setForm((prev) => ({ ...prev, iconUrl: dataUrl }));
+      notify('ok', `Selected app icon "${file.name}".`);
+    } catch (err) {
+      notify('err', err instanceof Error ? err.message : 'Failed to process icon image.');
+    }
+  };
+
+  const handleFeatureFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const dataUrl = await compressImageFileToDataUrl(file, {
+        maxWidth: 1024,
+        maxHeight: 500,
+        maxChars: APP_CONSTRAINTS.FEATURE_IMAGE_MAX,
+      });
+      setForm((prev) => ({ ...prev, featureImageUrl: dataUrl }));
+      notify('ok', `Selected feature image "${file.name}".`);
+    } catch (err) {
+      notify('err', err instanceof Error ? err.message : 'Failed to process feature image.');
+    }
+  };
+
+  const handleScreenshotFileSelect = async (
+    slot: 1 | 2 | 3,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const dataUrl = await compressImageFileToDataUrl(file, {
+        maxWidth: 960,
+        maxHeight: 540,
+        maxChars: APP_CONSTRAINTS.SCREENSHOT_MAX_LEN,
+      });
+      setForm((prev) => ({
+        ...prev,
+        ...(slot === 1
+          ? { screenshot1: dataUrl }
+          : slot === 2
+            ? { screenshot2: dataUrl }
+            : { screenshot3: dataUrl }),
+      }));
+      notify('ok', `Selected screenshot ${slot} ("${file.name}").`);
+    } catch (err) {
+      notify('err', err instanceof Error ? err.message : 'Failed to process screenshot image.');
+    }
   };
 
   const handleSaveApp = async (e: React.FormEvent) => {
@@ -405,12 +475,11 @@ export function AdminDashboard() {
       return;
     }
 
-    const screenshots = form.screenshotsText
-      .split('\n')
+    const screenshots = [form.screenshot1, form.screenshot2, form.screenshot3]
       .map((s) => s.trim())
       .filter(Boolean)
       .slice(0, APP_CONSTRAINTS.MAX_SCREENSHOTS)
-      .map((s) => s.slice(0, 500));
+      .map((s) => s.slice(0, APP_CONSTRAINTS.SCREENSHOT_MAX_LEN));
 
     const permissions = form.permissionsText
       .split(',')
@@ -453,6 +522,11 @@ export function AdminDashboard() {
       }
       if (form.iconUrl.trim()) {
         payload.iconUrl = form.iconUrl.trim().slice(0, APP_CONSTRAINTS.ICON_URL_MAX);
+      }
+      if (form.featureImageUrl.trim()) {
+        payload.featureImageUrl = form.featureImageUrl
+          .trim()
+          .slice(0, APP_CONSTRAINTS.FEATURE_IMAGE_MAX);
       }
 
       if (editingApp) {
@@ -1332,36 +1406,200 @@ export function AdminDashboard() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">APK Download URL *</label>
-                    <input
-                      type="text"
-                      required
-                      value={form.apkUrl}
-                      onChange={(e) => setForm({ ...form, apkUrl: e.target.value })}
-                      placeholder="https://... or appvolt://packages/app.apk"
-                      className="w-full px-3 py-2 text-sm font-mono-num border border-slate-200 rounded-lg"
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">APK Download URL *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.apkUrl}
+                    onChange={(e) => setForm({ ...form, apkUrl: e.target.value })}
+                    placeholder="https://... or appvolt://packages/app.apk"
+                    className="w-full px-3 py-2 text-sm font-mono-num border border-slate-200 rounded-lg"
+                  />
+                </div>
+
+                {/* App Icon Box + Right-Side Choose File Button */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-2.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    App Icon Image (Choose File or URL)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <AppIcon
+                      app={{
+                        name: form.name || 'App',
+                        iconPreset: form.iconPreset,
+                        iconUrl: form.iconUrl,
+                      }}
+                      size="md"
                     />
+                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                      <input
+                        type="text"
+                        value={form.iconUrl.startsWith('data:image/') ? 'Selected local icon image' : form.iconUrl}
+                        readOnly={form.iconUrl.startsWith('data:image/')}
+                        onChange={(e) => setForm({ ...form, iconUrl: e.target.value })}
+                        placeholder="Paste Icon URL or click Choose File →"
+                        className="flex-1 min-w-0 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#01875F]"
+                      />
+                      <label className="px-3.5 py-2 rounded-lg bg-[#01875F] hover:bg-[#01704F] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 shrink-0 min-h-[38px]">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Choose File</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleIconFileSelect}
+                          className="sr-only"
+                        />
+                      </label>
+                      {form.iconUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, iconUrl: '' })}
+                          title="Clear Icon"
+                          className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-red-600 shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Custom Icon URL (optional)
-                    </label>
+                </div>
+
+                {/* Feature Image + Choose File Button */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-2.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Feature Image / Hero Banner (Choose File or URL)
+                  </label>
+                  <div className="flex items-center gap-2">
                     <input
                       type="text"
-                      value={form.iconUrl}
-                      onChange={(e) => setForm({ ...form, iconUrl: e.target.value })}
-                      placeholder="https://..."
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg"
+                      value={
+                        form.featureImageUrl.startsWith('data:image/')
+                          ? 'Selected local feature banner image'
+                          : form.featureImageUrl
+                      }
+                      readOnly={form.featureImageUrl.startsWith('data:image/')}
+                      onChange={(e) => setForm({ ...form, featureImageUrl: e.target.value })}
+                      placeholder="Paste Feature Image URL or click Choose File →"
+                      className="flex-1 min-w-0 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#01875F]"
                     />
+                    <label className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 shrink-0 min-h-[38px]">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Choose File</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFeatureFileSelect}
+                        className="sr-only"
+                      />
+                    </label>
+                    {form.featureImageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, featureImageUrl: '' })}
+                        title="Clear Feature Image"
+                        className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-red-600 shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  {isRenderableImageSrc(form.featureImageUrl) && (
+                    <div className="rounded-lg overflow-hidden border border-slate-200 bg-white h-28">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={form.featureImageUrl}
+                        alt="Feature banner preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 3 Screenshot Images with 3 Choose File Buttons */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    App Screenshots (3 Image Slots)
+                  </label>
+                  <div className="space-y-3">
+                    {([1, 2, 3] as const).map((slot) => {
+                      const val =
+                        slot === 1
+                          ? form.screenshot1
+                          : slot === 2
+                            ? form.screenshot2
+                            : form.screenshot3;
+                      const updateSlot = (nextVal: string) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          ...(slot === 1
+                            ? { screenshot1: nextVal }
+                            : slot === 2
+                              ? { screenshot2: nextVal }
+                              : { screenshot3: nextVal }),
+                        }));
+                      return (
+                        <div
+                          key={slot}
+                          className="rounded-lg border border-slate-200 bg-white p-3 space-y-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-slate-600 w-24 shrink-0">
+                              Screenshot {slot}
+                            </span>
+                            <input
+                              type="text"
+                              value={
+                                val.startsWith('data:image/')
+                                  ? `Selected Screenshot ${slot} image`
+                                  : val
+                              }
+                              readOnly={val.startsWith('data:image/')}
+                              onChange={(e) => updateSlot(e.target.value)}
+                              placeholder={`Screenshot ${slot} URL or Choose File →`}
+                              className="flex-1 min-w-0 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-[#01875F]"
+                            />
+                            <label className="px-3 py-1.5 rounded-lg bg-[#01875F] hover:bg-[#01704F] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 shrink-0 min-h-[34px]">
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Choose File</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleScreenshotFileSelect(slot, e)}
+                                className="sr-only"
+                              />
+                            </label>
+                            {val && (
+                              <button
+                                type="button"
+                                onClick={() => updateSlot('')}
+                                title={`Clear Screenshot ${slot}`}
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 shrink-0"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                          {isRenderableImageSrc(val) && (
+                            <div className="h-24 w-44 rounded-md overflow-hidden border border-slate-200 bg-slate-100">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={val}
+                                alt={`Screenshot ${slot} preview`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-700">
-                      Icon Preset Style
+                      Fallback Icon Preset Style
                     </label>
                     <select
                       value={form.iconPreset}
@@ -1429,6 +1667,16 @@ export function AdminDashboard() {
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Live Store Card Preview
                 </h3>
+                {isRenderableImageSrc(form.featureImageUrl) && (
+                  <div className="rounded-xl overflow-hidden border border-slate-200 h-32 bg-slate-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={form.featureImageUrl}
+                      alt="Feature graphic preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 <div className="rounded-xl border border-slate-200 p-4 space-y-3">
                   <div className="flex items-start gap-3.5">
                     <AppIcon
@@ -1455,6 +1703,39 @@ export function AdminDashboard() {
                     {form.tagline || 'Your app tagline preview appears here.'}
                   </p>
                 </div>
+                {[form.screenshot1, form.screenshot2, form.screenshot3].some((s) =>
+                  isRenderableImageSrc(s)
+                ) && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                      Screenshots Preview
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[form.screenshot1, form.screenshot2, form.screenshot3].map((shot, idx) =>
+                        isRenderableImageSrc(shot) ? (
+                          <div
+                            key={idx}
+                            className="h-16 rounded-lg overflow-hidden border border-slate-200 bg-slate-100"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={shot}
+                              alt={`Preview ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            key={idx}
+                            className="h-16 rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] text-slate-400"
+                          >
+                            Slot {idx + 1}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </form>
           )}

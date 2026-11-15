@@ -19,7 +19,9 @@ export const APP_CONSTRAINTS = {
   SUBCATEGORY_MIN: 2,
   SUBCATEGORY_MAX: 40,
   VERSION_MAX: 32,
-  ICON_URL_MAX: 500,
+  ICON_URL_MAX: 120000,
+  FEATURE_IMAGE_MAX: 220000,
+  SCREENSHOT_MAX_LEN: 180000,
   APK_URL_MAX: 800,
   MAX_SCREENSHOTS: 8,
   MAX_PERMISSIONS: 12,
@@ -48,6 +50,7 @@ export interface StoreApp {
   minAndroid: string;
   ageRating: AgeRating;
   iconUrl?: string;
+  featureImageUrl?: string;
   iconPreset: string;
   apkUrl: string;
   screenshots: string[];

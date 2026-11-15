@@ -19,6 +19,7 @@ import {
   Zap,
 } from 'lucide-react';
 import type { StoreApp } from '@/lib/types';
+import { isRenderableImageSrc } from '@/lib/image-compress';
 
 export const ICON_PRESETS: Record<
   string,
@@ -63,7 +64,7 @@ export function AppIcon({
     xl: 'w-12 h-12',
   };
 
-  if (app.iconUrl && !imgFailed && (app.iconUrl.startsWith('http') || app.iconUrl.startsWith('/'))) {
+  if (app.iconUrl && !imgFailed && isRenderableImageSrc(app.iconUrl)) {
     return (
       <div
         className={`${sizeClasses[size]} overflow-hidden border border-black/10 bg-slate-100 shrink-0 shadow-xs`}
@@ -105,7 +106,7 @@ export function AppScreenshotPreview({
   const preset = ICON_PRESETS[app.iconPreset] || ICON_PRESETS['emerald-note'];
   const IconComp = preset.Icon;
 
-  const isUrl = (src.startsWith('http') || src.startsWith('/')) && !imgFailed;
+  const isUrl = isRenderableImageSrc(src) && !imgFailed;
 
   if (isUrl) {
     return (

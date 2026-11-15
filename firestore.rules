@@ -68,7 +68,7 @@ service cloud.firestore {
         data.keys().hasOnly([
           'id', 'name', 'packageName', 'developer', 'tagline', 'description',
           'whatsNew', 'category', 'subcategory', 'version', 'sizeMb', 'minAndroid',
-          'ageRating', 'iconUrl', 'iconPreset', 'apkUrl', 'screenshots', 'permissions',
+          'ageRating', 'iconUrl', 'featureImageUrl', 'iconPreset', 'apkUrl', 'screenshots', 'permissions',
           'featured', 'status', 'downloadCount', 'ratingAvg', 'reviewCount',
           'createdBy', 'createdAt', 'updatedAt'
         ]) &&
@@ -86,11 +86,12 @@ service cloud.firestore {
         data.sizeMb is number && data.sizeMb > 0 && data.sizeMb <= 10000 &&
         data.minAndroid is string && data.minAndroid.size() >= 1 && data.minAndroid.size() <= 32 &&
         data.ageRating in ['3+', '7+', '12+', '16+', '18+'] &&
-        (!('iconUrl' in data) || (data.iconUrl is string && data.iconUrl.size() <= 500)) &&
+        (!('iconUrl' in data) || (data.iconUrl is string && data.iconUrl.size() <= 120000)) &&
+        (!('featureImageUrl' in data) || (data.featureImageUrl is string && data.featureImageUrl.size() <= 220000)) &&
         data.iconPreset is string && data.iconPreset.size() >= 1 && data.iconPreset.size() <= 40 &&
         data.apkUrl is string && data.apkUrl.size() >= 1 && data.apkUrl.size() <= 800 &&
         data.screenshots is list && data.screenshots.size() <= 8 &&
-        (data.screenshots.size() == 0 || (data.screenshots[0] is string && data.screenshots[0].size() <= 500)) &&
+        (data.screenshots.size() == 0 || (data.screenshots[0] is string && data.screenshots[0].size() <= 180000)) &&
         data.permissions is list && data.permissions.size() <= 12 &&
         (data.permissions.size() == 0 || (data.permissions[0] is string && data.permissions[0].size() <= 80)) &&
         data.featured is bool &&
