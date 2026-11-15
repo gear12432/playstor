@@ -1,0 +1,508 @@
+{
+  "entities": {
+    "App": {
+      "title": "App",
+      "description": "An Android application or game published in the AppVolt Play Store.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "packageName": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120,
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$"
+        },
+        "developer": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "tagline": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 140
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 4000
+        },
+        "whatsNew": {
+          "type": "string",
+          "maxLength": 1500
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Apps", "Games"]
+        },
+        "subcategory": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 40
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "sizeMb": {
+          "type": "number"
+        },
+        "minAndroid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "ageRating": {
+          "type": "string",
+          "enum": ["3+", "7+", "12+", "16+", "18+"]
+        },
+        "iconUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "iconPreset": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "apkUrl": {
+          "type": "string",
+          "maxLength": 800
+        },
+        "screenshots": {
+          "type": "array"
+        },
+        "permissions": {
+          "type": "array"
+        },
+        "featured": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["published", "draft", "suspended"]
+        },
+        "downloadCount": {
+          "type": "number"
+        },
+        "ratingAvg": {
+          "type": "number"
+        },
+        "reviewCount": {
+          "type": "number"
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "packageName",
+        "developer",
+        "tagline",
+        "description",
+        "category",
+        "subcategory",
+        "version",
+        "sizeMb",
+        "minAndroid",
+        "ageRating",
+        "iconPreset",
+        "apkUrl",
+        "screenshots",
+        "permissions",
+        "featured",
+        "status",
+        "downloadCount",
+        "ratingAvg",
+        "reviewCount",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A user rating and review for an app.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "appId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "authorPhoto": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "rating": {
+          "type": "number"
+        },
+        "comment": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 1000
+        },
+        "status": {
+          "type": "string",
+          "enum": ["visible", "hidden"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "appId",
+        "authorId",
+        "authorName",
+        "rating",
+        "comment",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Play Store app or game category metadata.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 40
+        },
+        "group": {
+          "type": "string",
+          "enum": ["Apps", "Games"]
+        },
+        "sortOrder": {
+          "type": "number"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "name", "group", "sortOrder", "active", "createdAt", "updatedAt"]
+    },
+    "UserPublic": {
+      "title": "UserPublic",
+      "description": "Public non-PII user account profile.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "admin"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "banned"]
+        },
+        "downloadCount": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "role", "status", "downloadCount", "createdAt", "updatedAt"]
+    },
+    "UserPrivate": {
+      "title": "UserPrivate",
+      "description": "Isolated PII details for a user.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "provider": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "provider", "createdAt", "updatedAt"]
+    },
+    "LibraryItem": {
+      "title": "LibraryItem",
+      "description": "An app saved or installed in a user's Play Store library.",
+      "type": "object",
+      "properties": {
+        "appId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "appName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "installed": {
+          "type": "boolean"
+        },
+        "wishlisted": {
+          "type": "boolean"
+        },
+        "installedVersion": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["appId", "userId", "appName", "installed", "wishlisted", "createdAt", "updatedAt"]
+    },
+    "DownloadRecord": {
+      "title": "DownloadRecord",
+      "description": "Log entry for an APK download event.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "appId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "appName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "sizeMb": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "appId", "appName", "userId", "userName", "version", "sizeMb", "createdAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Trusted administrator access record.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "role": {
+          "type": "string",
+          "enum": ["superadmin", "admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "createdAt", "updatedAt"]
+    },
+    "AdminInvite": {
+      "title": "AdminInvite",
+      "description": "Pre-authorized admin email invite.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "invitedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "accepted"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "email", "invitedBy", "status", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/apps/{appId}": {
+      "schema": { "$ref": "#/entities/App" },
+      "description": "Catalog of Play Store apps and games."
+    },
+    "/apps/{appId}/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "User ratings and reviews for a specific app."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Storefront categories managed by admins."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserPublic" },
+      "description": "Public user account metadata without PII."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivate" },
+      "description": "Isolated user PII (email, auth provider)."
+    },
+    "/users/{userId}/library/{appId}": {
+      "schema": { "$ref": "#/entities/LibraryItem" },
+      "description": "User installed apps and wishlist."
+    },
+    "/downloads/{downloadId}": {
+      "schema": { "$ref": "#/entities/DownloadRecord" },
+      "description": "Audit log of APK downloads."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Authoritative admin role registry."
+    },
+    "/admin_invites/{inviteId}": {
+      "schema": { "$ref": "#/entities/AdminInvite" },
+      "description": "Admin pre-authorization invites by email."
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "771330533175",
+    "project_id": "appvolt-f5afa",
+    "storage_bucket": "appvolt-f5afa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:771330533175:android:8e8d4311053974678f9cb2",
+        "android_client_info": {
+          "package_name": "com.aistudio.appadmin.vmqrxp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "771330533175-m6hp27j25hfta63iqvslfb5llofq6nr1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBp49o5FsD8tYk2JbWZx82KFgBE4EPQztA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "771330533175-m6hp27j25hfta63iqvslfb5llofq6nr1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "AppVolt Play",
+  "description": "Google Play Store clone, verified APK app downloader, and real-time Cloud Firestore admin console.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
